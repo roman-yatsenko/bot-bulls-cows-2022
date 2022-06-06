@@ -18,7 +18,8 @@ def start_game(message):
             digit = random.choice(digits[1:])
         my_number += digit
         digits.remove(digit)
-    bot.reply_to(message, my_number)
+    bot.reply_to(message, 
+        f'Я загадал 4-значное число. Попробуй отгадать, {message.from_user.first_name}!')
 
 if __name__ == '__main__':
     bot.polling(non_stop=True)
