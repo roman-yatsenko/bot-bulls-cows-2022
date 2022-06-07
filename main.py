@@ -37,7 +37,13 @@ def show_help(message):
 def bot_answer(message):
     global active_game
     text = message.text
-    if len(text) == 4 and text.isnumeric() and len(text) == len(set(text)):
+    if not active_game:
+        if text == 'Да':
+            start_game(message)
+            return
+        else:
+            response = 'Для запуска игры набери /start'
+    elif len(text) == 4 and text.isnumeric() and len(text) == len(set(text)):
         cows, bulls = 0, 0
         for i in range(4):
             if text[i] in my_number:
