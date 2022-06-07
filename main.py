@@ -20,7 +20,7 @@ def start_game(message):
         my_number += digit
         digits.remove(digit)
     print(my_number)
-    bot.reply_to(message, 
+    bot.reply_to(message, 'Игра "Быки и коровы"\n'
         f'Я загадал 4-значное число. Попробуй отгадать, {message.from_user.first_name}!')
 
 @bot.message_handler(content_types=['text'])
@@ -34,7 +34,10 @@ def bot_answer(message):
                     bulls += 1
                 else:
                     cows += 1
-        response = f'cows: {cows} | bulls: {bulls}'
+        if bulls == 4:
+            response = 'Ты угадал!'
+        else:
+            response = f'Быки: {bulls} | Коровы : {cows}'
     else:
         response = 'Пришли мне 4-значное число с разными цифрами!'
     bot.send_message(message.from_user.id, response)
