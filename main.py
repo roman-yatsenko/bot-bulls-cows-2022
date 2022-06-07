@@ -23,6 +23,14 @@ def start_game(message):
     bot.reply_to(message, 'Игра "Быки и коровы"\n'
         f'Я загадал 4-значное число. Попробуй отгадать, {message.from_user.first_name}!')
 
+@bot.message_handler(commands=['help'])
+def show_help(message):
+    bot.reply_to(message, """
+Игра Быки и коровы
+
+Игра, в ходе которой за несколько попыток игрок должен определить 4-значное число, задуманное ботом. После каждой попытки бот сообщает количество угаданных цифр без с их позициями (количество «коров») и полных совпадений (количество «быков»).
+""")
+
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
     text = message.text
