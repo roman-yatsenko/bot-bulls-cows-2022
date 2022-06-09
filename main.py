@@ -1,17 +1,16 @@
 import telebot
 import random
-from config import bot_token
+import shelve
+
+from config import bot_token, db_name
 
 bot = telebot.TeleBot(bot_token)
 
 DIGITS = [str(x) for x in range(10)]
-my_number = ''
-active_game = False
 
 @bot.message_handler(commands=['start', 'game'])
 def start_game(message):
     digits = DIGITS.copy()
-    global my_number, active_game
     my_number = ''
     for pos in range(4):
         if pos:
@@ -20,8 +19,9 @@ def start_game(message):
             digit = random.choice(digits[1:])
         my_number += digit
         digits.remove(digit)
-    print(my_number)
-    active_game = True
+    print(f'{my_number} for {message.from_user.username}')
+    with shelve.open(db_name) as storage:
+        storage[str(message.from_user.id)] = my_number
     bot.reply_to(message, 'Игра "Быки и коровы"\n'
         f'Я загадал 4-значное число. Попробуй отгадать, {message.from_user.first_name}!')
 
@@ -37,30 +37,35 @@ def show_help(message):
 def bot_answer(message):
     global active_game
     text = message.text
-    if not active_game:
+    try:
+        with shelve.open(db_name) as storage:
+            my_number = storage[str(message.from_user.id)]
+        if len(text) == 4 and text.isnumeric() and len(text) == len(set(text)):
+            cows, bulls = 0, 0
+            for i in range(4):
+                if text[i] in my_number:
+                    if text[i] == my_number[i]:
+                        bulls += 1
+                    else:
+                        cows += 1
+            if bulls == 4:
+                print(f'{my_number} was discovered by {message.from_user.username} !')
+                with shelve.open(db_name) as storage:
+                    del storage[str(message.from_user.id)]
+                response = 'Ты угадал! Сыграем еще?'
+                bot.send_message(message.from_user.id, response,
+                    reply_markup=get_buttons())
+                return
+            else:
+                response = f'Быки: {bulls} | Коровы : {cows}'
+        else:
+            response = 'Пришли мне 4-значное число с разными цифрами!'
+    except KeyError:
         if text == 'Да':
             start_game(message)
             return
         else:
             response = 'Для запуска игры набери /start'
-    elif len(text) == 4 and text.isnumeric() and len(text) == len(set(text)):
-        cows, bulls = 0, 0
-        for i in range(4):
-            if text[i] in my_number:
-                if text[i] == my_number[i]:
-                    bulls += 1
-                else:
-                    cows += 1
-        if bulls == 4:
-            active_game = False
-            response = 'Ты угадал! Сыграем еще?'
-            bot.send_message(message.from_user.id, response,
-                reply_markup=get_buttons())
-            return
-        else:
-            response = f'Быки: {bulls} | Коровы : {cows}'
-    else:
-        response = 'Пришли мне 4-значное число с разными цифрами!'
     bot.send_message(message.from_user.id, response)
 
 def get_buttons():
