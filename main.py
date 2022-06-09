@@ -52,9 +52,11 @@ def bot_answer(message):
                 print(f'{my_number} was discovered by {message.from_user.username} !')
                 with shelve.open(db_name) as storage:
                     del storage[str(message.from_user.id)]
-                response = 'Ты угадал! Сыграем еще?'
+                response = 'Ты угадал! Сыграем еще?\n\n' + \
+                           '_Приходи учиться в Кит создавать ботов для Telegram_\n' + \
+                           'https://kit.kh.ua/'
                 bot.send_message(message.from_user.id, response,
-                    reply_markup=get_buttons())
+                    reply_markup=get_buttons(), parse_mode='Markdown')
                 return
             else:
                 response = f'Быки: {bulls} | Коровы : {cows}'
