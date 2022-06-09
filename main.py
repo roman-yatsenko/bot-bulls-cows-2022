@@ -9,6 +9,12 @@ bot = telebot.TeleBot(bot_token)
 DIGITS = [str(x) for x in range(10)]
 
 @bot.message_handler(commands=['start', 'game'])
+def select_level(message):
+    response = 'Игра "Быки и коровы"\n' + \
+               'Выбери уровень (количество цифр)'
+    bot.send_message(message.from_user.id, response,
+        reply_markup=get_level())    
+
 def start_game(message):
     digits = DIGITS.copy()
     my_number = ''
@@ -35,7 +41,6 @@ def show_help(message):
 
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
-    global active_game
     text = message.text
     try:
         with shelve.open(db_name) as storage:
@@ -63,8 +68,11 @@ def bot_answer(message):
         else:
             response = 'Пришли мне 4-значное число с разными цифрами!'
     except KeyError:
-        if text == 'Да':
+        if text in ('3', '4', '5'):
             start_game(message)
+            return
+        elif text == 'Да':
+            select_level(message)
             return
         else:
             response = 'Для запуска игры набери /start'
@@ -76,6 +84,14 @@ def get_buttons():
         resize_keyboard=True
     )
     buttons.add('Да', 'Нет')
+    return buttons
+
+def get_level():
+    buttons = telebot.types.ReplyKeyboardMarkup(
+        one_time_keyboard=True,
+        resize_keyboard=True
+    )
+    buttons.add('3', '4', '5')
     return buttons
 
 if __name__ == '__main__':
