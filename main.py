@@ -10,6 +10,9 @@ DIGITS = [str(x) for x in range(10)]
 
 @bot.message_handler(commands=['start', 'game'])
 def select_level(message):
+    with shelve.open(db_name) as storage:
+        if str(message.from_user.id) in storage:
+            del storage[str(message.from_user.id)]
     response = 'Игра "Быки и коровы"\n' + \
                'Выбери уровень (количество цифр)'
     bot.send_message(message.from_user.id, response,
@@ -42,9 +45,20 @@ def show_help(message):
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
     text = message.text
-    try:
-        with shelve.open(db_name) as storage:
+    with shelve.open(db_name) as storage:
+        if str(message.from_user.id) in storage:
             my_number = storage[str(message.from_user.id)]
+        else:
+            my_number = ''
+    if not my_number:
+        if text in ('3', '4', '5'):
+            start_game(message, int(text))
+            return
+        elif text == 'Да':
+            select_level(message)
+            return
+        response = 'Для запуска игры набери /start'
+    else:
         level = len(my_number)
         if len(text) == level and text.isnumeric() and len(text) == len(set(text)):
             cows, bulls = 0, 0
@@ -59,8 +73,8 @@ def bot_answer(message):
                 with shelve.open(db_name) as storage:
                     del storage[str(message.from_user.id)]
                 response = 'Ты угадал! Сыграем еще?\n\n' + \
-                           '_Приходи учиться в Кит создавать ботов для Telegram_\n' + \
-                           'https://kit.kh.ua/'
+                        '_Приходи учиться в Кит создавать ботов для Telegram_\n' + \
+                        'https://kit.kh.ua/'
                 bot.send_message(message.from_user.id, response,
                     reply_markup=get_buttons(), parse_mode='Markdown')
                 return
@@ -68,15 +82,6 @@ def bot_answer(message):
                 response = f'Быки: {bulls} | Коровы : {cows}'
         else:
             response = f'Пришли мне {level}-значное число с разными цифрами!'
-    except KeyError:
-        if text in ('3', '4', '5'):
-            start_game(message, int(text))
-            return
-        elif text == 'Да':
-            select_level(message)
-            return
-        else:
-            response = 'Для запуска игры набери /start'
     bot.send_message(message.from_user.id, response)
 
 def get_buttons():
