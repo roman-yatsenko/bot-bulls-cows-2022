@@ -9,14 +9,21 @@ bot = telebot.TeleBot(bot_token)
 DIGITS = [str(x) for x in range(10)]
 
 @bot.message_handler(commands=['start', 'game'])
-def select_level(message):
+def select_mode(message):
     with shelve.open(db_name) as storage:
         if str(message.from_user.id) in storage:
             del storage[str(message.from_user.id)]
+            del storage[str(message.from_user.id) + '__mode']
+    response = 'Игра "Быки и коровы"\n' + \
+               'Выбери кто загадывает число'
+    bot.send_message(message.from_user.id, response,
+        reply_markup=get_buttons('Человек', 'Бот'))    
+
+def select_level(message):
     response = 'Игра "Быки и коровы"\n' + \
                'Выбери уровень (количество цифр)'
     bot.send_message(message.from_user.id, response,
-        reply_markup=get_level())    
+        reply_markup=get_buttons('3', '4', '5'))    
 
 def start_game(message, level):
     digits = DIGITS.copy()
@@ -51,53 +58,55 @@ def bot_answer(message):
         else:
             my_number = ''
     if not my_number:
-        if text in ('3', '4', '5'):
-            start_game(message, int(text))
-            return
-        elif text == 'Да':
-            select_level(message)
-            return
-        response = 'Для запуска игры набери /start'
+        bot_answer_not_in_game(message)
     else:
-        level = len(my_number)
-        if len(text) == level and text.isnumeric() and len(text) == len(set(text)):
-            cows, bulls = 0, 0
-            for i in range(level):
-                if text[i] in my_number:
-                    if text[i] == my_number[i]:
-                        bulls += 1
-                    else:
-                        cows += 1
-            if bulls == level:
-                print(f'{my_number} was discovered by {message.from_user.username} !')
-                with shelve.open(db_name) as storage:
-                    del storage[str(message.from_user.id)]
-                response = 'Ты угадал! Сыграем еще?\n\n' + \
-                        '_Приходи учиться в Кит создавать ботов для Telegram_\n' + \
-                        'https://kit.kh.ua/'
-                bot.send_message(message.from_user.id, response,
-                    reply_markup=get_buttons(), parse_mode='Markdown')
-                return
-            else:
-                response = f'Быки: {bulls} | Коровы : {cows}'
+        bot_answer_to_man_guess(message, my_number)
+
+def bot_answer_not_in_game(message):
+    text = message.text
+    if text in ('Человек', 'Бот'):
+        with shelve.open(db_name) as storage:
+            storage[str(message.from_user.id) + '__mode'] = text
+        select_level(message)
+    if text in ('3', '4', '5'):
+        start_game(message, int(text))
+    elif text == 'Да':
+        select_mode(message)
+    return
+
+def bot_answer_to_man_guess(message, my_number):
+    level = len(my_number)
+    text = message.text 
+    if len(text) == level and text.isnumeric() and len(text) == len(set(text)):
+        cows, bulls = 0, 0
+        for i in range(level):
+            if text[i] in my_number:
+                if text[i] == my_number[i]:
+                    bulls += 1
+                else:
+                    cows += 1
+        if bulls == level:
+            print(f'{my_number} was discovered by {message.from_user.username} !')
+            with shelve.open(db_name) as storage:
+                del storage[str(message.from_user.id)]
+            response = 'Ты угадал! Сыграем еще?\n\n' + \
+                    '_Приходи учиться в Кит создавать ботов для Telegram_\n' + \
+                    'https://kit.kh.ua/'
+            bot.send_message(message.from_user.id, response,
+                reply_markup=get_buttons('Да', 'Нет'), parse_mode='Markdown')
+            return
         else:
-            response = f'Пришли мне {level}-значное число с разными цифрами!'
+            response = f'Быки: {bulls} | Коровы : {cows}'
+    else:
+        response = f'Пришли мне {level}-значное число с разными цифрами!'
     bot.send_message(message.from_user.id, response)
 
-def get_buttons():
+def get_buttons(*args):
     buttons = telebot.types.ReplyKeyboardMarkup(
         one_time_keyboard=True,
         resize_keyboard=True
     )
-    buttons.add('Да', 'Нет')
-    return buttons
-
-def get_level():
-    buttons = telebot.types.ReplyKeyboardMarkup(
-        one_time_keyboard=True,
-        resize_keyboard=True
-    )
-    buttons.add('3', '4', '5')
+    buttons.add(*args)
     return buttons
 
 if __name__ == '__main__':
