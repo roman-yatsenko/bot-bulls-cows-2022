@@ -78,13 +78,7 @@ def bot_answer_to_man_guess(message, my_number):
     level = len(my_number)
     text = message.text 
     if len(text) == level and text.isnumeric() and len(text) == len(set(text)):
-        cows, bulls = 0, 0
-        for i in range(level):
-            if text[i] in my_number:
-                if text[i] == my_number[i]:
-                    bulls += 1
-                else:
-                    cows += 1
+        bulls, cows = bulls_n_cows(my_number, text)
         if bulls == level:
             print(f'{my_number} was discovered by {message.from_user.username} !')
             with shelve.open(db_name) as storage:
@@ -108,6 +102,11 @@ def get_buttons(*args):
     )
     buttons.add(*args)
     return buttons
+
+def bulls_n_cows(a, b):
+    bulls = sum(1 for x, y in zip(a, b) if x == y)
+    cows = len(set(a) & set(b)) - bulls
+    return bulls, cows
 
 if __name__ == '__main__':
     bot.polling(non_stop=True)
