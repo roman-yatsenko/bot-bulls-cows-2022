@@ -1,9 +1,32 @@
+from typing import Tuple
 import telebot
 import random
 import shelve
 from itertools import product
+from dataclasses import dataclass
 
 from config import bot_token, db_name
+
+
+@dataclass
+class User:
+    number: str = ''
+    mode: str = 'bot'
+    level: int = 4
+    history: Tuple = ()
+
+def get_or_create_user(id):
+    with shelve.open(db_name) as storage:
+        return storage.get(str(id), User())
+
+def save_user(id, user):
+    with shelve.open(db_name) as storage:
+        storage[str(id)] = user
+
+def del_user(id):
+    with shelve.open(db_name) as storage:
+        if str(id) in storage:
+            del storage[str(id)]
 
 bot = telebot.TeleBot(bot_token)
 
@@ -11,10 +34,7 @@ DIGITS = [str(x) for x in range(10)]
 
 @bot.message_handler(commands=['start', 'game'])
 def select_mode(message):
-    with shelve.open(db_name) as storage:
-        if str(message.from_user.id) in storage:
-            del storage[str(message.from_user.id)]
-            del storage[str(message.from_user.id) + '__mode']
+    del_user(message.from_user.id)
     response = 'Игра "Быки и коровы"\n' + \
                'Выбери кто загадывает число'
     bot.send_message(message.from_user.id, response,
@@ -37,9 +57,10 @@ def start_game(message, level):
         my_number += digit
         digits.remove(digit)
     print(f'{my_number} for {message.from_user.username}')
-    with shelve.open(db_name) as storage:
-        storage[str(message.from_user.id)] = my_number
-        storage[str(message.from_user.id) + '__level'] = level
+    user = get_or_create_user(message.from_user.id)
+    user.number = my_number
+    user.level = level
+    save_user(message.from_user.id, user)
     bot.reply_to(message, 'Игра "Быки и коровы"\n'
         f'Я загадал {level}-значное число. Попробуй отгадать, {message.from_user.first_name}!')
 
@@ -53,28 +74,27 @@ def show_help(message):
 
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
-    text = message.text
-    with shelve.open(db_name) as storage:
-        if str(message.from_user.id) in storage:
-            my_number = storage[str(message.from_user.id)]
-        else:
-            my_number = ''
+    user = get_or_create_user(message.from_user.id)
     # Если режим загадал человек, то бот отправляет свой вариант
-    if not my_number:
+    if not user.number:
         bot_answer_not_in_game(message)
     else:
-        bot_answer_to_man_guess(message, my_number)
+        bot_answer_to_man_guess(message, user.number)
 
 def bot_answer_not_in_game(message):
     text = message.text
     if text in ('Человек', 'Бот'):
-        with shelve.open(db_name) as storage:
-            storage[str(message.from_user.id) + '__mode'] = text
+        user = get_or_create_user(message.from_user.id)
+        user.mode = text
+        save_user(message.from_user.id, user)
         select_level(message)
-    if text in ('3', '4', '5'):
+    elif text in ('3', '4', '5'):
         start_game(message, int(text))
     elif text == 'Да':
         select_mode(message)
+    else:
+        response = f'Пришли мне /start или /game для запуска игры'
+        bot.send_message(message.from_user.id, response)
     return
 
 def bot_answer_to_man_guess(message, my_number):
@@ -84,8 +104,7 @@ def bot_answer_to_man_guess(message, my_number):
         bulls, cows = bulls_n_cows(my_number, text)
         if bulls == level:
             print(f'{my_number} was discovered by {message.from_user.username} !')
-            with shelve.open(db_name) as storage:
-                del storage[str(message.from_user.id)]
+            del_user(message.from_user.id)
             response = 'Ты угадал! Сыграем еще?\n\n' + \
                     '_Приходи учиться в Кит создавать ботов для Telegram_\n' + \
                     'https://kit.kh.ua/'
@@ -99,23 +118,23 @@ def bot_answer_to_man_guess(message, my_number):
     bot.send_message(message.from_user.id, response)
 
 def bot_answer_with_guess(message):
-    with shelve.open(db_name) as storage:
-        history_id = str(message.from_user.id) + '__history'
-        history = storage.get(history_id, [])
-        level = storage.get(str(message.from_user.id) + '__level', 0)
-        assert level == 0, 'Error: level 0 in bot_answer_with_guess'
-    all_variants = [''.join(x) for x in product(DIGITS, level)
+    user = get_or_create_user(message.from_user.id)
+    history = list(user.history)
+    all_variants = [''.join(x) for x in product(DIGITS, user.level)
                     if len(x) == len(set(x)) and x[0] == '0']
     while True:
         guess = random.choice(all_variants)
         all_variants.remove(guess)
         if is_compatible(guess, history):
             break
+    history.append((guess, None, None))
+    user.history = tuple(history)
+    save_user(message.from_user.id, user)
     keys = []
-    for bulls in range(level + 1):
-        for cows in range(level + 1- bulls):
+    for bulls in range(user.level + 1):
+        for cows in range(user.level + 1- bulls):
             keys.append(f'{bulls}-{cows}')
-    response = f'Мой вариант {gues}\n' + \
+    response = f'Мой вариант {guess}\n' + \
                 'Сколько быков и коров я угадал?'
     bot.send_message(message.from_user.id, response,
         reply_markup=get_buttons(keys))
@@ -138,4 +157,5 @@ def is_compatible(guess, history):
                for previous_guess, bulls, cows in history)
 
 if __name__ == '__main__':
+    print('Bot started')
     bot.polling(non_stop=True)
