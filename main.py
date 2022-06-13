@@ -83,13 +83,16 @@ def bot_answer(message):
 
 def bot_answer_not_in_game(message):
     text = message.text
+    user = get_or_create_user(message.from_user.id)
     if text in ('Человек', 'Бот'):
-        user = get_or_create_user(message.from_user.id)
         user.mode = text
         save_user(message.from_user.id, user)
         select_level(message)
     elif text in ('3', '4', '5'):
-        start_game(message, int(text))
+        if user.mode != 'Бот':
+            bot_answer_with_guess(message)
+        else:
+            start_game(message, int(text))
     elif text == 'Да':
         select_mode(message)
     else:
@@ -120,8 +123,8 @@ def bot_answer_to_man_guess(message, my_number):
 def bot_answer_with_guess(message):
     user = get_or_create_user(message.from_user.id)
     history = list(user.history)
-    all_variants = [''.join(x) for x in product(DIGITS, user.level)
-                    if len(x) == len(set(x)) and x[0] == '0']
+    all_variants = [''.join(x) for x in product(DIGITS, repeat=user.level)
+                    if len(x) == len(set(x)) and x[0] != '0']
     while True:
         guess = random.choice(all_variants)
         all_variants.remove(guess)
@@ -137,7 +140,7 @@ def bot_answer_with_guess(message):
     response = f'Мой вариант {guess}\n' + \
                 'Сколько быков и коров я угадал?'
     bot.send_message(message.from_user.id, response,
-        reply_markup=get_buttons(keys))
+        reply_markup=get_buttons(*keys))
 
 def get_buttons(*args):
     buttons = telebot.types.ReplyKeyboardMarkup(
