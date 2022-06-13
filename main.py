@@ -103,6 +103,14 @@ def bot_answer_with_guess(message):
     history = list(user.history)
     if history:
         history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')])
+        # check win
+        if history[-1][1] == user.level:
+            del_user_with_message(
+            message.from_user.id,
+            text = 'Я угадал :-)\n' \
+                   'Пришли мне /start или /game для запуска игры'
+            )
+            return
     all_variants = [''.join(x) for x in product(DIGITS, repeat=user.level)
                     if len(x) == len(set(x)) and x[0] != '0']
     while all_variants:
@@ -111,9 +119,11 @@ def bot_answer_with_guess(message):
         if is_compatible(guess, history):
             break
     else:
-        del_user(message.from_user.id)
-        response = 'К сожалению, в твоих ответах была ошибка, у меня больше нет вариантов :-('
-        bot.send_message(message.from_user.id, response)
+        del_user_with_message(
+            message.from_user.id,
+            text = 'К сожалению, в твоих ответах была ошибка,' \
+                   'у меня больше нет вариантов :-('
+        )
         return
     history.append((guess, None, None))
     user.history = tuple(history)
@@ -126,6 +136,10 @@ def bot_answer_with_guess(message):
                 'Сколько быков и коров я угадал?'
     bot.send_message(message.from_user.id, response,
         reply_markup=get_buttons(*keys))
+
+def del_user_with_message(id, text):
+    del_user(id)
+    bot.send_message(id, text)
 
 def get_buttons(*args):
     buttons = telebot.types.ReplyKeyboardMarkup(
