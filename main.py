@@ -53,10 +53,12 @@ def show_help(message):
 def bot_answer(message):
     user = get_or_create_user(message.from_user.id)
     # Если режим загадал человек, то бот отправляет свой вариант
-    if not user.number:
+    if not user.number and user.mode != 'Человек':
         bot_answer_not_in_game(message)
-    else:
+    elif user.mode == 'Бот':
         bot_answer_to_man_guess(message, user.number)
+    else:
+        bot_answer_with_guess(message)
 
 def bot_answer_not_in_game(message):
     text = message.text
@@ -99,13 +101,20 @@ def bot_answer_to_man_guess(message, my_number):
 def bot_answer_with_guess(message):
     user = get_or_create_user(message.from_user.id)
     history = list(user.history)
+    if history:
+        history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')])
     all_variants = [''.join(x) for x in product(DIGITS, repeat=user.level)
                     if len(x) == len(set(x)) and x[0] != '0']
-    while True:
+    while all_variants:
         guess = random.choice(all_variants)
         all_variants.remove(guess)
         if is_compatible(guess, history):
             break
+    else:
+        del_user(message.from_user.id)
+        response = 'К сожалению, в твоих ответах была ошибка, у меня больше нет вариантов :-('
+        bot.send_message(message.from_user.id, response)
+        return
     history.append((guess, None, None))
     user.history = tuple(history)
     save_user(message.from_user.id, user)
