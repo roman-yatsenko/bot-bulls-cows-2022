@@ -102,17 +102,9 @@ def bot_answer_to_man_guess(message, my_number):
 
 def bot_answer_with_guess(message):
     user = get_or_create_user(message.from_user.id)
+    if check_bot_win(user, message):
+        return
     history = list(user.history)
-    if history:
-        history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')])
-        # check win
-        if history[-1][1] == user.level:
-            del_user_with_message(
-            message.from_user.id,
-            text = 'Я угадал :-)\n' \
-                   'Пришли мне /start или /game для запуска игры'
-            )
-            return
     all_variants = [''.join(x) for x in product(DIGITS, repeat=user.level)
                     if len(x) == len(set(x)) and x[0] != '0']
     while all_variants:
@@ -139,6 +131,22 @@ def bot_answer_with_guess(message):
     bot.send_message(message.from_user.id, response,
         reply_markup=get_buttons(*keys))
 
+def check_bot_win(user, message):
+    history = list(user.history)
+    if history:
+        history[-1] = (history[-1][0], *[int(x) for x in message.text.split('-')])
+        # check win
+        if history[-1][1] == user.level:
+            del_user_with_message(
+            message.from_user.id,
+            text = 'Я угадал :-)\n' \
+                   'Пришли мне /start или /game для запуска игры'
+            )
+            return True
+        user.history = tuple(history)
+        save_user(message.from_user.id, user)
+    return False
+    
 def del_user_with_message(id, text):
     del_user(id)
     bot.send_message(id, text)
