@@ -9,7 +9,7 @@ from config import db_name
 class User:
     number: str = ''
     mode: str = ''
-    level: int = 4
+    level: int = 0
     history: Tuple = ()
 
 def get_or_create_user(id):

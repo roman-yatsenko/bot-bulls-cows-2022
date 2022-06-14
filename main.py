@@ -53,7 +53,7 @@ def show_help(message):
 def bot_answer(message):
     user = get_or_create_user(message.from_user.id)
     # Если режим загадал человек, то бот отправляет свой вариант
-    if not user.number and user.mode != 'Человек':
+    if not user.number and not user.level:
         bot_answer_not_in_game(message)
     elif user.mode == 'Бот':
         bot_answer_to_man_guess(message, user.number)
@@ -69,6 +69,8 @@ def bot_answer_not_in_game(message):
         select_level(message)
     elif text in ('3', '4', '5'):
         if user.mode != 'Бот':
+            user.level = int(text)
+            save_user(message.from_user.id, user)
             bot_answer_with_guess(message)
         else:
             start_game(message, int(text))
