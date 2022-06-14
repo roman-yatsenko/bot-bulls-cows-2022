@@ -12,6 +12,7 @@ class User:
     mode: str = ''
     level: int = 0
     history: Tuple = ()
+    next_move_man: bool = True
 
 def get_or_create_user(id):
     return storage.get(str(id), User())

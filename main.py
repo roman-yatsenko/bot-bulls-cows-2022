@@ -15,7 +15,7 @@ def select_mode(message):
     response = 'Игра "Быки и коровы"\n' + \
                'Выбери кто загадывает число'
     bot.send_message(message.from_user.id, response,
-        reply_markup=get_buttons('Человек', 'Бот'))    
+        reply_markup=get_buttons('Человек', 'Бот', 'Дуэль'))    
 
 def select_level(message):
     response = 'Игра "Быки и коровы"\n' + \
@@ -38,8 +38,13 @@ def start_game(message, level):
     user.number = my_number
     user.level = level
     save_user(message.from_user.id, user)
-    bot.reply_to(message, 'Игра "Быки и коровы"\n'
-        f'Я загадал {level}-значное число. Попробуй отгадать, {message.from_user.first_name}!')
+    if user.mode == 'Бот':
+        bot.reply_to(message, 'Игра "Быки и коровы"\n'
+            f'Я загадал {level}-значное число. Попробуй отгадать, {message.from_user.first_name}!')
+    else:
+        bot.reply_to(message, 'Игра "Быки и коровы"\n'
+            f'Я загадал {level}-значное число. Ты тоже загадай.\n'
+            f'Кто отгадает первым, {message.from_user.first_name}? Твой ход')
 
 @bot.message_handler(commands=['help'])
 def show_help(message):
@@ -52,25 +57,30 @@ def show_help(message):
 @bot.message_handler(content_types=['text'])
 def bot_answer(message):
     user = get_or_create_user(message.from_user.id)
-    # Если режим загадал человек, то бот отправляет свой вариант
     if not user.number and not user.level:
         bot_answer_not_in_game(message)
-    elif user.mode == 'Бот':
+    elif user.mode == 'Бот' or (user.mode == 'Дуэль' and user.next_move_man):
         bot_answer_to_man_guess(message, user.number)
-    else:
+    elif user.mode == 'Человек':
         bot_answer_with_guess(message)
+    else:
+        if check_bot_win(user, message):
+            return
+        bot.send_message(message.from_user.id, 'Твой ход')
+        user.next_move_man = True
+        save_user(message.from_user.id, user)
 
 def bot_answer_not_in_game(message):
     text = message.text
     user = get_or_create_user(message.from_user.id)
-    if text in ('Человек', 'Бот'):
+    if text in ('Человек', 'Бот', 'Дуэль'):
         user.mode = text
         save_user(message.from_user.id, user)
         select_level(message)
     elif text in ('3', '4', '5'):
-        if user.mode != 'Бот':
-            user.level = int(text)
-            save_user(message.from_user.id, user)
+        user.level = int(text)
+        save_user(message.from_user.id, user)
+        if user.mode == 'Человек':
             bot_answer_with_guess(message)
         else:
             start_game(message, int(text))
@@ -99,10 +109,15 @@ def bot_answer_to_man_guess(message, my_number):
     else:
         response = f'Пришли мне {level}-значное число с разными цифрами!'
     bot.send_message(message.from_user.id, response)
+    user = get_or_create_user(message.from_user.id)
+    if user.mode == 'Дуэль':
+        user.next_move_man = False
+        save_user(message.from_user.id, user)
+        bot_answer_with_guess(message)
 
 def bot_answer_with_guess(message):
     user = get_or_create_user(message.from_user.id)
-    if check_bot_win(user, message):
+    if user.mode == 'Человек' and check_bot_win(user, message):
         return
     history = list(user.history)
     all_variants = [''.join(x) for x in product(DIGITS, repeat=user.level)
